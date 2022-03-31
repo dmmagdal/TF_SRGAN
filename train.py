@@ -8,7 +8,7 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import Model
+from tensorflow.keras import Model, layers
 from tensorflow.keras.models import load_model
 import tensorflow_datasets as tfds
 from srgan import create_generator, create_discriminator
@@ -18,6 +18,8 @@ from utils import VGGLoss, resize_images, scale_images
 
 class SRGAN(keras.Model):
 	def __init__(self, generator, discriminator, gen_loss, disc_loss, gen_opt, disc_opt, **kwargs):
+		super(SRGAN, self).__init__(**kwargs)
+		
 		# Generator/Discriminator models.
 		self.gen = generator
 		self.disc = discriminator
@@ -34,10 +36,10 @@ class SRGAN(keras.Model):
 	def train_step(self, data):
 		lr_imgs = data["lr"]
 		hr_imgs = data["hr"]
-		batch_size = tf.shape(hr_imgs)[0]
+		# batch_size = tf.shape(hr_imgs)[0]
 
-		fake_label = np.zeros((batch_size, 1))
-		real_label = np.ones((batch_size, 1))
+		# fake_label = np.zeros((batch_size, 1))
+		# real_label = np.ones((batch_size, 1))
 
 		with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
 			fake_imgs = self.gen(lr_imgs)
@@ -106,8 +108,8 @@ def main():
 	lr_inputs = layers.Input(shape=lr_shape)
 
 	# Initialize models.
-	vgg_loss = VGGLoss(hr_inputs)
-	vgg_opt = keras.optimizers.Adam()
+	vgg_loss = VGGLoss(hr_shape).compute_loss
+	gen_opt = keras.optimizers.Adam()
 	generator = create_generator(lr_inputs, num_res_blocks=16)
 	# generator.compile(loss=vgg_loss, optimizer="adam")
 	generator.summary()
@@ -120,22 +122,25 @@ def main():
 	# )
 	discriminator.summary()
 
-	
+	# Initialize SRGAN model.
 	gan = SRGAN(
 		generator, discriminator, vgg_loss, disc_loss,
 		gen_opt, disc_opt
+	)
+	gan.compile(
+		loss=["binary_crossentropy", "mse",], optimizer="adam"
 	)
 
 	epochs = 100
 	batch_size = 4
 	train_data = train_data.prefetch(buffer_size=autotune).batch(batch_size)
 	valid_data = valid_data.prefetch(buffer_size=autotune).batch(batch_size)
-	history = model.fit(
+	history = gan.fit(
 		train_data,
 		epochs=epochs,
-		validation_data=valid_data 
+		#validation_data=valid_data 
 	)
-	model.save(f"generator_{epochs}.h5")
+	gan.save(f"generator_{epochs}.h5")
 
 
 	# Exit the program.

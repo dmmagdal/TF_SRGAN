@@ -8,6 +8,7 @@
 
 import tensorflow as tf
 from tensorflow import keras
+from tensorflow.keras import Model
 from tensorflow.keras.applications import VGG19
 
 
@@ -30,7 +31,7 @@ class VGGLoss:
 		self.mse = keras.losses.MeanSquaredError(name="vgg_mse")
 
 
-	def call(self, y_true, y_pred):
+	def compute_loss(self, y_true, y_pred):
 		# Pass both the real and fake (generated) high res images
 		# through the VGG19 model.
 		real_features = self.vgg(y_true)
