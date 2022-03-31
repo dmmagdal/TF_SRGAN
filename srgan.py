@@ -120,7 +120,7 @@ def create_discriminator(inputs):
 		if first_layer:
 			first_layer = False
 		x = DiscriminatorBlock(
-			filter, stride, batch_norm=first_layer\
+			filter, stride, batch_norm=first_layer
 		)(x)
 
 	x = layers.Flatten()(x)
@@ -192,14 +192,6 @@ def main():
 	train_data = data["train"]
 	valid_data = data["validation"]
 
-	print(type(train_data))
-	single_sample = list(train_data.as_numpy_iterator())[0]
-	print(single_sample)
-	print(single_sample["hr"])
-	print(single_sample["lr"])
-	print(tf.shape(single_sample["hr"]))
-	print(tf.shape(single_sample["lr"]))
-
 	# Reshape lr & hr images to the set sizes. Since we're using the
 	# bicubic x4 subset, make sure that the hr dimensions are 4x the lr
 	# dimensions (hr = (128, 128, 3), lr = (32, 32, 3)).
@@ -211,16 +203,7 @@ def main():
 		resize_images, num_parallel_calls=autotune
 	)
 
-	single_sample = list(train_data.as_numpy_iterator())[0]
-	print(single_sample)
-	print(single_sample["hr"])
-	print(single_sample["lr"])
-	print(tf.shape(single_sample["hr"]))
-	print(tf.shape(single_sample["lr"]))
-
 	# Normalize (scale) values (divide by 255.0).
-	print(single_sample["lr"] / 255.0)
-
 	train_data = train_data.map(
 		scale_images, num_parallel_calls=autotune
 	)
@@ -228,10 +211,6 @@ def main():
 		scale_images, num_parallel_calls=autotune
 	)
 	single_sample = list(train_data.as_numpy_iterator())[0]
-	print(single_sample)
-	print(tf.shape(single_sample["hr"]))
-	print(tf.shape(single_sample["lr"]))
-
 	hr_shape = tf.shape(single_sample["hr"]).numpy()
 	hr_shape = (hr_shape[0], hr_shape[1], hr_shape[2])
 	lr_shape = tf.shape(single_sample["lr"]).numpy()
