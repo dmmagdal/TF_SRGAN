@@ -307,6 +307,33 @@ def main():
 		if (e + 1) % 10 == 0:
 			generator.save("srgan_generator_epochs" + str(e + 1) + ".h5")
 
+		# Randomly sample from validation data and perform super resolution
+		# on that sample.
+		random.seed(42)
+		index = random.randint(0, len(list(valid_data.as_numpy_iterator())))
+		sample = list(valid_data.as_numpy_iterator())[index]
+		src_img = sample["lr"]
+		tar_img = sample["hr"]
+
+		loaded_generator = load_model(
+			"srgan_generator_epochs" + str(epochs) + ".h5"
+		)
+		gen_img = loaded_generator.predict(src_img)
+
+		# Plot all three images.
+		plt.figure(figsize=(16, 8))
+		plt.subplot(231)
+		plt.title("LR Image")
+		plt.imshow(src_img[0, :, :, :])
+		plt.subplot(232)
+		plt.title("Superresolution")
+		plt.imshow(gen_img[0, :, :, :])
+		plt.subplot(232)
+		plt.title("HR Image")
+		plt.imshow(tar_img[0, :, :, :])
+		# plt.show()
+		plt.savefig(f"SRGAN_Generator_Sample{e + 1}.png")
+
 	# Randomly sample from validation data and perform super resolution
 	# on that sample.
 	random.seed(42)
