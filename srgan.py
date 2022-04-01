@@ -325,7 +325,7 @@ def main():
 		plt.subplot(232)
 		plt.title("Superresolution")
 		plt.imshow(gen_img[0, :, :, :])
-		plt.subplot(232)
+		plt.subplot(233)
 		plt.title("HR Image")
 		plt.imshow(tar_img[0, :, :, :])
 		# plt.show()
