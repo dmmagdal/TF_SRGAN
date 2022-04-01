@@ -315,7 +315,7 @@ def main():
 		src_img = sample["lr"]
 		tar_img = sample["hr"]
 
-		gen_img = generator.predict(src_img)
+		gen_img = generator.predict(src_img) * 255.0
 
 		# Plot all three images.
 		plt.figure(figsize=(16, 8))
