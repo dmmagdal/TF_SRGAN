@@ -114,7 +114,7 @@ def main():
 	# generator.compile(loss=vgg_loss, optimizer="adam")
 	generator.summary()
 
-	disc_loss = keras.losses.BinaryCrossentropy(from_logits=True)
+	disc_loss = keras.losses.BinaryCrossentropy(from_logits=False)#True)
 	disc_opt = keras.optimizers.Adam()
 	discriminator = create_discriminator(hr_inputs)
 	# discriminator.compile(
@@ -138,7 +138,7 @@ def main():
 	history = gan.fit(
 		train_data,
 		epochs=epochs,
-		#validation_data=valid_data 
+		validation_data=valid_data 
 	)
 	gan.save(f"generator_{epochs}.h5")
 
