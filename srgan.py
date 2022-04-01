@@ -315,10 +315,7 @@ def main():
 		src_img = sample["lr"]
 		tar_img = sample["hr"]
 
-		loaded_generator = load_model(
-			"srgan_generator_epochs" + str(epochs) + ".h5"
-		)
-		gen_img = loaded_generator.predict(src_img)
+		gen_img = generator.predict(src_img)
 
 		# Plot all three images.
 		plt.figure(figsize=(16, 8))
