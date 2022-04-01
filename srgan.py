@@ -126,6 +126,7 @@ def create_discriminator(inputs):
 	x = layers.Flatten()(x)
 	x = layers.Dense(df * 16)(x)
 	x = layers.LeakyReLU(alpha=0.2)(x)
+	x = layers.Dropout(0.5)(x)
 	validity = layers.Dense(1, activation="sigmoid")(x)
 
 	return Model(inputs=inputs, outputs=validity, name="discriminator")
@@ -227,8 +228,11 @@ def main():
 	generator.summary()
 
 	discriminator = create_discriminator(hr_inputs)
+	disc_opt = keras.optimizers.Adam(beta_1=0.5, beta_2=0.99)
 	discriminator.compile(
-		loss="binary_crossentropy", optimizer="adam", metrics=["accuracy"]
+		loss="binary_crossentropy", #optimizer="adam", metrics=["accuracy"]
+		optimizer=disc_opt,
+		metrics=["accuracy"]
 	)
 	discriminator.summary()
 
@@ -239,14 +243,16 @@ def main():
 	gan = create_combined_model(
 		generator, discriminator, vgg, lr_inputs, hr_inputs
 	)
+	gan_opt = keras.optimizers.Adam(beta_1=0.5, beta_2=0.99)
 	gan.compile(
 		loss=["binary_crossentropy", "mse"], loss_weights=[1e-3, 1],
-		optimizer="adam",
+		#optimizer="adam",
+		optimizer=gan_opt,
 	)
 	gan.summary()
 
 	# Training loop.
-	epochs = 1000#100#5
+	epochs = 100 #1000#100#5
 	batch_size = 4
 	train_data = train_data.prefetch(buffer_size=autotune).batch(batch_size)
 	valid_data = valid_data.prefetch(buffer_size=autotune).batch(batch_size)
@@ -301,128 +307,15 @@ def main():
 		if (e + 1) % 10 == 0:
 			generator.save("srgan_generator_epochs" + str(e + 1) + ".h5")
 
-
-	'''
-	# Train a subset of the images.
-	n = 5_000
-	lr_folder = "./lr_images"
-	hr_folder = "./hr_images"
-	lr_images = load_images(lr_folder)
-	lr_images = np.array(lr_images)
-	hr_images = load_images(hr_images)
-	hr_images = np.array(hr_images)
-
-	# Scale values.
-	lr_images = lr_images / 255.0
-	hr_images = hr_images / 255.0
-
-	# Split images into training and testing sets.
-	lr_train, lr_test, hr_train, hr_test = train_test_split(
-		lr_images, hr_images, test_size=0.33, random_state=42
-	)
-
-	# Image input shapes respectively (HR = (128, 128, 3), 
-	# LR = (32, 32, 3)).
-	hr_shape = (hr_train.shape[1], hr_train.shape[2], hr_train.shape[3])
-	lr_shape = (hr_train.shape[1], lr_train.shape[2], lr_train.shape[3])
-
-	hr_inputs = layers.Input(shape=hr_shape)
-	lr_inputs = layers.Input(shape=lr_shape)
-
-	# Initialize models.
-	generator = create_generator(lr_inputs, num_res_blocks=16)
-	generator.summary()
-
-	discriminator = create_discriminator(hr_inputs)
-	discriminator.compile(
-		loss="binary_crossentropy", optimizer="adam", metrics=["accuracy"]
-	)
-	discriminator.summary()
-
-	vgg = build_vgg19((128, 128, 3))
-	vgg.summary()
-	vgg.trainable = False
-
-	gan = create_combined_model(
-		generator, discriminator, vgg, lr_inputs, hr_inputs
-	)
-	gan.compile(
-		loss=["binary_crossentropy", "mse"], loss_weights=[1e-3, 1],
-		optimizer="adam",
-	)
-	gan.summary()
-
-	# Training setup.
-	batch_size = 1
-	train_lr_batches = []
-	train_hr_batches = []
-	for it in range(int(hr_train.shape[0] / batch_size)):
-		start_idx = it * batch_size
-		end_idx = start_idx + batch_size
-		train_hr_batches.append(hr_train[start_idx:end_idx])
-		train_lr_batches.append(lr_train[start_idx:end_idx])
-
-	epochs = 5
-	for e in range(epochs):
-		fake_label = np.zeros((batch_size, 1))
-		real_label = np.ones((batch_size, 1))
-
-		g_losses = []
-		d_losses = []
-
-		for b in tqdm(range(len(train_hr_batches))):
-			lr_imgs = train_lr_batches[b]
-			hr_imgs = train_hr_batches[b]
-
-			fake_imgs = generator.predict_on_batch(lr_imgs)
-
-			# Train discriminator on fake and real HR images.
-			discriminator.trainable = True
-			d_loss_gen = discriminator.train_on_batch(fake_imgs, fake_label)
-			d_loss_real = discriminator.train_on_batch(hr_imgs, real_label)
-
-			# Fix discriminator (set it to not be trainable).
-			discriminator.trainable = False
-
-			# Average the discriminator loss.
-			d_loss = 0.5 * np.add(d_loss_gen, d_loss_real)
-
-			# Extract VGG features (used for calculating loss).
-			image_features = vgg.predict(hr_imgs)
-
-			# Train generator.
-			g_loss, _, _ = generator.train_on_batch(
-				[lr_imgs, hr_imgs], [real_label, image_features]
-			)
-
-			# Save losses to a list so that it can be averaged and
-			# reported.
-			d_losses.append(d_loss)
-			g_losses.append(g_loss)
-
-		# Convert list of losses to an array to make it easier to
-		# average.
-		d_losses = np.array(d_losses)
-		g_losses = np.array(g_losses)
-
-		# Calculate the average loss for the generator and
-		# discriminator.
-		d_loss = np.sum(d_losses, axis=0) / len(d_losses)
-		g_loss = np.sum(g_losses, axis=0) / len(g_losses)
-
-		# Report the training progress. Save generator after every n
-		# epochs.
-		print(f"Epoch: {e + 1}, Gen-Loss: {g_loss}, Disc-Loss: {d_loss}")
-		if (e + 1) % 10 == 0:
-			generator.save("srgan_generator_epochs" + str(e + 1) + ".h5")
-
-	# Perform super resolution using the saved generator model.
+	# Randomly sample from validation data and perform super resolution
+	# on that sample.
 	random.seed(42)
-	index = random.randint(0, len(lr_test))
-	[x1, x2] = [lr_test, hr_test]
-	src_img, tar_img = x1[index], x2[index]
+	index = random.randint(0, len(list(valid_data.as_numpy_iterator())))
+	sample = list(valid_data.as_numpy_iterator())[index]
+	src_img = sample["lr"]
+	tar_img = sample["hr"]
 
-	loaded_generator = generator.load_model(
+	loaded_generator = load_model(
 		"srgan_generator_epochs" + str(epochs) + ".h5"
 	)
 	gen_img = loaded_generator.predict(src_img)
@@ -439,7 +332,6 @@ def main():
 	plt.title("HR Image")
 	plt.imshow(tar_img[0, :, :, :])
 	plt.show()
-	'''
 
 	# Exit the program.
 	exit(0)
