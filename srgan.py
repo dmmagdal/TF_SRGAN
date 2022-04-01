@@ -138,7 +138,7 @@ def build_vgg19(hr_shape):
 	)
 
 	return Model(
-		inputs=vgg.inputs, outputs=vgg.layers[20].output, name="vgg19"
+		inputs=vgg.inputs, outputs=vgg.layers[10].output, name="vgg19"
 	)
 
 
