@@ -12,63 +12,162 @@ from tensorflow.keras import Model, layers
 from tensorflow.keras.models import load_model
 import tensorflow_datasets as tfds
 from srgan import create_generator, create_discriminator
-from srgan import create_combined_model
-from utils import VGGLoss, resize_images, scale_images
+from srgan import build_vgg19
+from utils import resize_images, scale_images, save_images
 
 
 class SRGAN(keras.Model):
-	def __init__(self, generator, discriminator, gen_loss, disc_loss, gen_opt, disc_opt, **kwargs):
+	def __init__(self, generator, discriminator, vgg, **kwargs):
 		super(SRGAN, self).__init__(**kwargs)
-		
-		# Generator/Discriminator models.
-		self.gen = generator
-		self.disc = discriminator
 
-		# Generator/Discriminator losses.
-		self.gen_loss = gen_loss
-		self.disc_loss = disc_loss
+		# Models.
+		self.discriminator = discriminator
+		self.generator = generator
+		self.vgg = vgg
 
-		# Generator/Discriminator optimizers.
-		self.gen_optimizer = gen_opt
+		# Mean squared error for VGG loss.
+		self.mse = keras.losses.MeanSquaredError()
+
+
+	def vgg_loss(self, y_true, y_pred):
+		# Pass both the real and fake (generated) high res images
+		# through the VGG19 model.
+		real_features = self.vgg(y_true)
+		fake_features = self.vgg(y_pred)
+
+		# Return the MSE between the real and generated images.
+		return self.mse(real_features, fake_features)
+
+
+	def compile(self, gen_opt, disc_opt):
+		super(SRGAN, self).compile()
 		self.disc_optimizer = disc_opt
+		self.gen_optimizer = gen_opt
+		self.d_loss_metric = keras.metrics.Mean(name="d_loss")
+		self.g_loss_metric = keras.metrics.Mean(name="g_loss")
+		self.d_loss_fn = keras.losses.BinaryCrossentropy(
+			from_logits=False
+		)
+		self.g_loss_fn = self.vgg_loss
+
+
+	@property
+	def metrics(self):
+		return [self.d_loss_metric, self.g_loss_metric]
 
 
 	def train_step(self, data):
+		# Get the input (low resolution/lr and high resolution/hr
+		# images). Also extract the batch size.
 		lr_imgs = data["lr"]
 		hr_imgs = data["hr"]
-		# batch_size = tf.shape(hr_imgs)[0]
+		batch_size = tf.shape(hr_imgs)[0]
 
-		# fake_label = np.zeros((batch_size, 1))
-		# real_label = np.ones((batch_size, 1))
+		# Use the gradient tapes for both the discrinimator and
+		# generator to track gradients for the respective models.
+		with tf.GradientTape() as disc_tape, tf.GradientTape() as gen_tape:
+			# Generate fake images.
+			fake_imgs = self.generator(lr_imgs)
 
-		with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-			fake_imgs = self.gen(lr_imgs)
+			# Combine with real images.
+			combined_imgs = tf.concat([fake_imgs, hr_imgs], axis=0)
 
-			self.disc.trainable = True
-			real_outputs = self.disc(hr_imgs)
-			fake_outputs = self.disc(fake_imgs)
-			self.disc.trainable = False
+			# Initialize labels for the respective images (1 for fake
+			# images from the generator and 0 for real hr images).
+			labels = tf.concat(
+				[tf.ones((batch_size, 1)), tf.zeros((batch_size, 1))],
+				axis=0
+			)
 
-			gen_loss = self.gen_loss(hr_imgs, fake_imgs)
-			disc_loss = self.disc_loss(real_outputs, fake_outputs)
+			# Add some random noise to the labels (supposed to be an
+			# important trick). See DCGAN example from Keras examples.
+			labels += 0.5 * tf.random.uniform(tf.shape(labels))
 
-		gen_gradients = gen_tape.gradient(
-			gen_loss, self.gen.trainable_variables
+			# Train discriminator.
+			predictions = self.discriminator(combined_imgs)
+			d_loss = self.d_loss_fn(labels, predictions)
+			grads = disc_tape.gradient(
+				d_loss, self.discriminator.trainable_weights
+			)
+			self.disc_optimizer.apply_gradients(
+				zip(grads, self.discriminator.trainable_variables)
+			)
+
+			# Train generator (Do NOT update the weights of the
+			# discriminator).
+			g_loss = self.g_loss_fn(hr_imgs, fake_imgs)
+			grads = gen_tape.gradient(g_loss, self.generator.trainable_weights)
+			self.gen_optimizer.apply_gradients(
+				zip(grads, self.generator.trainable_weights)
+			)
+
+		'''
+		fake_imgs = self.generator(lr_imgs)
+
+		# Combine with real images.
+		combined_imgs = tf.concat([fake_imgs, hr_imgs], axis=0)
+
+		labels = tf.concat(
+			[tf.ones((batch_size, 1)), tf.zeros((batch_size, 1))],
+			axis=0
 		)
-		disc_gradients = disc_tape.gradient(
-			disc_loss, self.disc.trainable_variables
+
+		# Add some random noise to the labels (supposed to be an
+		# important trick). See DCGAN example from Keras examples.
+		labels += 0.5 * tf.random.uniform(tf.shape(labels))
+
+		# Train discriminator.
+		with tf.GradientTape() as tape:
+			predictions = self.discriminator(combined_imgs)
+			d_loss = self.d_loss_fn(labels, predictions)
+		grads = tape.gradient(
+			d_loss, self.discriminator.trainable_weights
 		)
-		
-		self.gen_optimizer.apply_gradients(
-			zip(gen_gradients, self.gen.trainable_variables)
-		)
+		print(grads)
 		self.disc_optimizer.apply_gradients(
-			zip(disc_gradients, self.disc.trainable_variables)
+			zip(grads, self.discriminator.trainable_variables)
 		)
 
+		# Train generator (Do NOT update the weights of the
+		# discriminator).
+		with tf.GradientTape() as tape:
+			g_loss = self.g_loss_fn(hr_imgs, fake_imgs)
+		grads = tape.gradient(g_loss, self.generator.trainable_weights)
+		print(grads)
+		exit()
+		self.gen_optimizer.apply_gradients(
+			zip(grads, self.generator.trainable_weights)
+		)
+		'''
 
-	def save(self, path):
-		self.generator.save(path)
+		# Update metrics.
+		self.d_loss_metric.update_state(d_loss)
+		self.g_loss_metric.update_state(g_loss)
+		return {
+			"d_loss": self.d_loss_metric.result(),
+			"g_loss": self.g_loss_metric.result(),
+		}
+
+
+	def save(self, path, h5=True):
+		# self.generator.save(path)
+		if h5:
+			self.generator.save(path + ".h5")
+			self.discriminator.save(path + ".h5")
+		else:
+			self.generator.save(path)
+			self.discriminator.save(path)
+
+
+class GANMonitor(keras.callbacks.Callback):
+	def __init__(self, valid_data, epoch_freq=10):
+		self.valid_data = valid_data
+		self.epoch_freq = epoch_freq
+
+
+	def on_epoch_end(self, epoch, logs=None):
+		if epoch % self.epoch_freq == 0:
+			save_images(self.valid_data, self.model.generator, epoch)
 
 
 def main():
@@ -107,41 +206,37 @@ def main():
 	hr_inputs = layers.Input(shape=hr_shape)
 	lr_inputs = layers.Input(shape=lr_shape)
 
-	# Initialize models.
-	vgg_loss = VGGLoss(hr_shape).compute_loss
+	# Initialize models (generator, discriminator, and vgg).
 	gen_opt = keras.optimizers.Adam()
 	generator = create_generator(lr_inputs, num_res_blocks=16)
-	# generator.compile(loss=vgg_loss, optimizer="adam")
 	generator.summary()
 
-	disc_loss = keras.losses.BinaryCrossentropy(from_logits=False)#True)
 	disc_opt = keras.optimizers.Adam()
 	discriminator = create_discriminator(hr_inputs)
-	# discriminator.compile(
-	# 	loss="binary_crossentropy", optimizer="adam", metrics=["accuracy"]
-	# )
 	discriminator.summary()
 
-	# Initialize SRGAN model.
-	gan = SRGAN(
-		generator, discriminator, vgg_loss, disc_loss,
-		gen_opt, disc_opt
-	)
-	gan.compile(
-		loss=["binary_crossentropy", "mse",], optimizer="adam"
-	)
+	vgg = build_vgg19(hr_shape)
+	vgg.trainable = False
 
-	epochs = 100
+	# Initialize SRGAN model.
+	gan = SRGAN(generator, discriminator, vgg)
+	gan.compile(gen_opt, disc_opt)
+	save_callback = GANMonitor(valid_data)
+
+	# Train the GAN.
+	epochs = 1000#100
 	batch_size = 4
 	train_data = train_data.prefetch(buffer_size=autotune).batch(batch_size)
 	valid_data = valid_data.prefetch(buffer_size=autotune).batch(batch_size)
 	history = gan.fit(
 		train_data,
 		epochs=epochs,
-		validation_data=valid_data 
+		callbacks=[save_callback]
 	)
-	gan.save(f"generator_{epochs}.h5")
 
+	# Save the generator from the GAN.
+	#gan.save(f"generator_{epochs}.h5")
+	gan.save("SRGAN_{epochs}")
 
 	# Exit the program.
 	exit(0)

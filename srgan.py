@@ -51,6 +51,11 @@ class ResBlock(layers.Layer):
 		return self.add([inputs, outs])
 
 
+	# def get_config(self):
+	# 	config = super(ResBlock, self).get_config()
+	# 	return config
+
+
 class UpScaleBlock(layers.Layer):
 	def __init__(self, **kwargs):
 		super().__init__()
@@ -64,6 +69,11 @@ class UpScaleBlock(layers.Layer):
 		x = self.upsample(x)
 		outs = self.prelu(x)
 		return outs
+
+
+	# def get_config(self):
+	# 	config = super(UpScaleBlock, self).get_config()
+	# 	return config	
 
 
 # Generator model.
@@ -106,6 +116,11 @@ class DiscriminatorBlock(layers.Layer):
 			x = self.batch_norm(x)
 		outs = self.leaky_relu(x)
 		return outs
+
+
+	# def get_config(self):
+	# 	config = super(DiscriminatorBlock, self).get_config()
+	# 	return config
 
 
 # Discriminator model.
@@ -185,6 +200,32 @@ def scale_images(images):
 		"hr": images["hr"] / 255.0, 
 		"lr": images["lr"] / 255.0
 	}
+
+
+def save_images(valid_data, generator, e):
+	# Randomly sample from validation data and perform super resolution
+	# on that sample.
+	random.seed(42)
+	index = random.randint(0, len(list(valid_data.as_numpy_iterator())))
+	sample = list(valid_data.as_numpy_iterator())[index]
+	src_img = sample["lr"]
+	tar_img = sample["hr"]
+
+	gen_img = generator.predict(src_img) * 255.0
+
+	# Plot all three images.
+	plt.figure(figsize=(16, 8))
+	plt.subplot(231)
+	plt.title("LR Image")
+	plt.imshow(src_img[0, :, :, :])
+	plt.subplot(232)
+	plt.title("Superresolution")
+	plt.imshow(gen_img[0, :, :, :])
+	plt.subplot(233)
+	plt.title("HR Image")
+	plt.imshow(tar_img[0, :, :, :])
+	# plt.show()
+	plt.savefig(f"SRGAN_Generator_Sample{e + 1}.png")
 
 
 def main():
@@ -306,30 +347,8 @@ def main():
 		print(f"Epoch: {e + 1}, Gen-Loss: {g_loss}, Disc-Loss: {d_loss}")
 		if (e + 1) % 10 == 0:
 			generator.save("srgan_generator_epochs" + str(e + 1) + ".h5")
-
-		# Randomly sample from validation data and perform super resolution
-		# on that sample.
-		random.seed(42)
-		index = random.randint(0, len(list(valid_data.as_numpy_iterator())))
-		sample = list(valid_data.as_numpy_iterator())[index]
-		src_img = sample["lr"]
-		tar_img = sample["hr"]
-
-		gen_img = generator.predict(src_img) * 255.0
-
-		# Plot all three images.
-		plt.figure(figsize=(16, 8))
-		plt.subplot(231)
-		plt.title("LR Image")
-		plt.imshow(src_img[0, :, :, :])
-		plt.subplot(232)
-		plt.title("Superresolution")
-		plt.imshow(gen_img[0, :, :, :])
-		plt.subplot(233)
-		plt.title("HR Image")
-		plt.imshow(tar_img[0, :, :, :])
-		# plt.show()
-		plt.savefig(f"SRGAN_Generator_Sample{e + 1}.png")
+			# generator.save("srgan_generator_epochs" + str(e + 1))
+			save_images(valid_data, generator, e)
 
 	# Randomly sample from validation data and perform super resolution
 	# on that sample.
@@ -352,7 +371,7 @@ def main():
 	plt.subplot(232)
 	plt.title("Superresolution")
 	plt.imshow(gen_img[0, :, :, :])
-	plt.subplot(232)
+	plt.subplot(233)
 	plt.title("HR Image")
 	plt.imshow(tar_img[0, :, :, :])
 	plt.show()
