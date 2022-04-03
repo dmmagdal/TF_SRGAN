@@ -121,8 +121,6 @@ class DiscriminatorBlock(layers.Layer):
 	def get_config(self):
 		config = super(DiscriminatorBlock, self).get_config()
 		config.update({
-			"filters": self.filters,
-			"strides": self.strides,
 			"use_batchnorm": self.use_batchnorm,
 		})
 		return config
@@ -146,7 +144,6 @@ def create_discriminator(inputs):
 	x = layers.Flatten()(x)
 	x = layers.Dense(df * 16)(x)
 	x = layers.LeakyReLU(alpha=0.2)(x)
-	x = layers.Dropout(0.5)(x)
 	validity = layers.Dense(1, activation="sigmoid")(x)
 
 	return Model(inputs=inputs, outputs=validity, name="discriminator")
