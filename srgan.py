@@ -118,9 +118,14 @@ class DiscriminatorBlock(layers.Layer):
 		return outs
 
 
-	# def get_config(self):
-	# 	config = super(DiscriminatorBlock, self).get_config()
-	# 	return config
+	def get_config(self):
+		config = super(DiscriminatorBlock, self).get_config()
+		config.update({
+			"filters": self.filters,
+			"strides": self.strides,
+			"use_batchnorm": self.use_batchnorm,
+		})
+		return config
 
 
 # Discriminator model.
@@ -152,9 +157,12 @@ def build_vgg19(hr_shape):
 	vgg = VGG19(
 		weights="imagenet", include_top=False, input_shape=hr_shape
 	)
+	block3_conv4 = 10
+	block5_conv4 = 20
 
 	return Model(
-		inputs=vgg.inputs, outputs=vgg.layers[10].output, name="vgg19"
+		inputs=vgg.inputs, outputs=vgg.layers[block5_conv4].output, 
+		name="vgg19"
 	)
 
 
@@ -224,7 +232,6 @@ def save_images(valid_data, generator, e):
 	plt.subplot(233)
 	plt.title("HR Image")
 	plt.imshow(tar_img[0, :, :, :])
-	# plt.show()
 	plt.savefig(f"SRGAN_Generator_Sample{e + 1}.png")
 
 

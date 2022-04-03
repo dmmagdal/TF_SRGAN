@@ -45,10 +45,9 @@ class SRGAN(keras.Model):
 		self.gen_optimizer = gen_opt
 		self.d_loss_metric = keras.metrics.Mean(name="d_loss")
 		self.g_loss_metric = keras.metrics.Mean(name="g_loss")
-		self.d_loss_fn = keras.losses.BinaryCrossentropy(
-			from_logits=False
-		)
+		self.d_loss_fn = keras.losses.BinaryCrossentropy()
 		self.g_loss_fn = self.vgg_loss
+		self.custom_loss_weights = [1e-3, 1]
 
 
 	@property
@@ -85,7 +84,8 @@ class SRGAN(keras.Model):
 
 			# Train discriminator.
 			predictions = self.discriminator(combined_imgs)
-			d_loss = self.d_loss_fn(labels, predictions)
+			#d_loss = self.d_loss_fn(labels, predictions) * self.custom_loss_weights[0]
+			d_loss = self.d_loss_fn(labels, predictions, self.custom_loss_weights[0])
 			grads = disc_tape.gradient(
 				d_loss, self.discriminator.trainable_weights
 			)
@@ -95,8 +95,11 @@ class SRGAN(keras.Model):
 
 			# Train generator (Do NOT update the weights of the
 			# discriminator).
-			g_loss = self.g_loss_fn(hr_imgs, fake_imgs)
-			grads = gen_tape.gradient(g_loss, self.generator.trainable_weights)
+			#g_loss = self.g_loss_fn(hr_imgs, fake_imgs) * self.custom_loss_weights[1]
+			g_loss = self.g_loss_fn(hr_imgs, fake_imgs, self.custom_loss_weights[1])
+			grads = gen_tape.gradient(
+				g_loss, self.generator.trainable_weights
+			)
 			self.gen_optimizer.apply_gradients(
 				zip(grads, self.generator.trainable_weights)
 			)
@@ -207,16 +210,17 @@ def main():
 	lr_inputs = layers.Input(shape=lr_shape)
 
 	# Initialize models (generator, discriminator, and vgg).
-	gen_opt = keras.optimizers.Adam()
+	gen_opt = keras.optimizers.Adam(1e-4, beta_1=0.5, beta_2=0.99)
 	generator = create_generator(lr_inputs, num_res_blocks=16)
 	generator.summary()
 
-	disc_opt = keras.optimizers.Adam()
+	disc_opt = keras.optimizers.Adam(1e-4, beta_1=0.5, beta_2=0.99)
 	discriminator = create_discriminator(hr_inputs)
 	discriminator.summary()
 
 	vgg = build_vgg19(hr_shape)
 	vgg.trainable = False
+	vgg.summary()
 
 	# Initialize SRGAN model.
 	gan = SRGAN(generator, discriminator, vgg)
@@ -224,10 +228,12 @@ def main():
 	save_callback = GANMonitor(valid_data)
 
 	# Train the GAN.
-	epochs = 1000#100
+	epochs = 500#1000#100
 	batch_size = 4
-	train_data = train_data.prefetch(buffer_size=autotune).batch(batch_size)
-	valid_data = valid_data.prefetch(buffer_size=autotune).batch(batch_size)
+	train_data = train_data.prefetch(buffer_size=autotune)\
+		.batch(batch_size)
+	valid_data = valid_data.prefetch(buffer_size=autotune)\
+		.batch(batch_size)
 	history = gan.fit(
 		train_data,
 		epochs=epochs,
