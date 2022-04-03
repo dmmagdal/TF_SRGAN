@@ -104,45 +104,6 @@ class SRGAN(keras.Model):
 				zip(grads, self.generator.trainable_weights)
 			)
 
-		'''
-		fake_imgs = self.generator(lr_imgs)
-
-		# Combine with real images.
-		combined_imgs = tf.concat([fake_imgs, hr_imgs], axis=0)
-
-		labels = tf.concat(
-			[tf.ones((batch_size, 1)), tf.zeros((batch_size, 1))],
-			axis=0
-		)
-
-		# Add some random noise to the labels (supposed to be an
-		# important trick). See DCGAN example from Keras examples.
-		labels += 0.5 * tf.random.uniform(tf.shape(labels))
-
-		# Train discriminator.
-		with tf.GradientTape() as tape:
-			predictions = self.discriminator(combined_imgs)
-			d_loss = self.d_loss_fn(labels, predictions)
-		grads = tape.gradient(
-			d_loss, self.discriminator.trainable_weights
-		)
-		print(grads)
-		self.disc_optimizer.apply_gradients(
-			zip(grads, self.discriminator.trainable_variables)
-		)
-
-		# Train generator (Do NOT update the weights of the
-		# discriminator).
-		with tf.GradientTape() as tape:
-			g_loss = self.g_loss_fn(hr_imgs, fake_imgs)
-		grads = tape.gradient(g_loss, self.generator.trainable_weights)
-		print(grads)
-		exit()
-		self.gen_optimizer.apply_gradients(
-			zip(grads, self.generator.trainable_weights)
-		)
-		'''
-
 		# Update metrics.
 		self.d_loss_metric.update_state(d_loss)
 		self.g_loss_metric.update_state(g_loss)
