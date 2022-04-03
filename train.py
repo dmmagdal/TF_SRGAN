@@ -5,6 +5,7 @@
 # Python 3.7
 
 
+import json
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -46,7 +47,8 @@ class SRGAN(keras.Model):
 		self.d_loss_metric = keras.metrics.Mean(name="d_loss")
 		self.g_loss_metric = keras.metrics.Mean(name="g_loss")
 		self.d_loss_fn = keras.losses.BinaryCrossentropy()
-		self.g_loss_fn = self.vgg_loss
+		self.g_loss_fn = self.vgg_loss # content loss
+		self.g_loss_fn2 = keras.losses.MeanSquaredError()
 		self.custom_loss_weights = [1e-3, 1]
 
 
@@ -80,12 +82,13 @@ class SRGAN(keras.Model):
 
 			# Add some random noise to the labels (supposed to be an
 			# important trick). See DCGAN example from Keras examples.
-			labels += 0.5 * tf.random.uniform(tf.shape(labels))
+			#labels += 0.05 * tf.random.uniform(tf.shape(labels))
 
 			# Train discriminator.
 			predictions = self.discriminator(combined_imgs)
-			#d_loss = self.d_loss_fn(labels, predictions) * self.custom_loss_weights[0]
-			d_loss = self.d_loss_fn(labels, predictions, self.custom_loss_weights[0])
+			d_loss = self.d_loss_fn(labels, predictions)
+			# d_loss = self.d_loss_fn(labels, predictions) * self.custom_loss_weights[0]
+			# d_loss = self.d_loss_fn(labels, predictions, self.custom_loss_weights[0])
 			grads = disc_tape.gradient(
 				d_loss, self.discriminator.trainable_weights
 			)
@@ -95,10 +98,13 @@ class SRGAN(keras.Model):
 
 			# Train generator (Do NOT update the weights of the
 			# discriminator).
-			#g_loss = self.g_loss_fn(hr_imgs, fake_imgs) * self.custom_loss_weights[1]
-			g_loss = self.g_loss_fn(hr_imgs, fake_imgs, self.custom_loss_weights[1])
+			g_loss = self.g_loss_fn(hr_imgs, fake_imgs) * self.custom_loss_weights[1]
+			g_loss2 = self.d_loss_fn(
+				labels[:batch_size, :], predictions[:batch_size, :], self.custom_loss_weights[0]
+			)
+			# g_loss2 = self.g_loss_fn2(hr_imgs, fake_imgs, self.custom_loss_weights[1])
 			grads = gen_tape.gradient(
-				g_loss, self.generator.trainable_weights
+				g_loss + g_loss2, self.generator.trainable_weights
 			)
 			self.gen_optimizer.apply_gradients(
 				zip(grads, self.generator.trainable_weights)
@@ -130,8 +136,8 @@ class GANMonitor(keras.callbacks.Callback):
 
 
 	def on_epoch_end(self, epoch, logs=None):
-		if epoch % self.epoch_freq == 0:
-			save_images(self.valid_data, self.model.generator, epoch)
+		if (epoch + 1) % self.epoch_freq == 0:
+			save_images(self.valid_data, self.model.generator, epoch, True)
 
 
 def main():
