@@ -89,8 +89,6 @@ class SRGAN(keras.Model):
 			# Train discriminator.
 			predictions = self.discriminator(combined_imgs)
 			d_loss = self.d_loss_fn(labels, predictions)
-			# d_loss = self.d_loss_fn(labels, predictions) * self.custom_loss_weights[0]
-			# d_loss = self.d_loss_fn(labels, predictions, self.custom_loss_weights[0])
 			grads = disc_tape.gradient(
 				d_loss, self.discriminator.trainable_weights
 			)
@@ -100,18 +98,23 @@ class SRGAN(keras.Model):
 
 			# Train generator (Do NOT update the weights of the
 			# discriminator).
+			# VGG-MSE loss between features extracted from HR and
+			# generated image.
 			g_loss = self.g_loss_fn(hr_imgs, fake_imgs) * self.custom_loss_weights[1]
+			# Weighted BCE loss between how many times discriminator
+			# falsely labeled generated image as "real" (We want the
+			# discriminator to try and wrongly label a generated image
+			# as real).
 			g_loss2 = self.d_loss_fn(
-				#labels[:batch_size, :], predictions[:batch_size, :], self.custom_loss_weights[0]
-				labels[-batch_size:, :], predictions[:batch_size, :], self.custom_loss_weights[0] # ***
-				# ***) This line is to see how many Real [0] predictions made it past the discriminator.
-				# We are trying to make sure that the generator fools the discriminator so we take the
-				# loss of the predictions on the generated images with the number of times the discriminator
-				# falsely predicted the image was "real"/0.
+				labels[-batch_size:, :], predictions[:batch_size, :], 
+				self.custom_loss_weights[0]
 			)
-			g_loss3 = self.g_loss_fn2(hr_imgs, fake_imgs, self.custom_loss_weights[1])
+			# Raw MSE loss between HR and generated image.
+			# g_loss3 = self.g_loss_fn2(hr_imgs, fake_imgs, self.custom_loss_weights[1])
 			grads = gen_tape.gradient(
-				g_loss + g_loss2 + g_loss3, self.generator.trainable_weights
+				# g_loss, self.generator.trainable_weights
+				g_loss + g_loss2, self.generator.trainable_weights # This gave best results
+				# g_loss + g_loss2 + g_loss3, self.generator.trainable_weights
 			)
 			self.gen_optimizer.apply_gradients(
 				zip(grads, self.generator.trainable_weights)

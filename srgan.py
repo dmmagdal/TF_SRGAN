@@ -1,7 +1,7 @@
 # srgan.py
 # Implement and train the Super Resolution GAN in Tensorflow 2 for
 # image super resolution.
-# Source: https://www.youtube.com/watch?v=1HqjPqNglPc&t=472s&ab_
+# Source (Youtube): https://www.youtube.com/watch?v=1HqjPqNglPc&t=472s&ab_
 # channel=DigitalSreeni
 # Source (Github): https://github.com/bnsreenu/python_for_
 # microscopists/blob/master/255_256_SRGAN/SRGAN_train.py
