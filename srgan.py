@@ -10,6 +10,10 @@
 # Source (Paper): https://arxiv.org/pdf/1609.04802.pdf
 # Source (Supplimentary Video): https://www.youtube.com/watch?v=FwvTsx_
 # dxn8&ab_channel=AIExpedition
+# Source (Another Reference): https://blog.paperspace.com/super-
+# resolution-generative-adversarial-networks/
+# Source (DGGAN Keras Example): https://keras.io/examples/generative/
+# dcgan_overriding_train_step/
 # Tensorflow 2.7.0
 # Windows/MacOS/Linux
 # Python 3.7
@@ -51,9 +55,9 @@ class ResBlock(layers.Layer):
 		return self.add([inputs, outs])
 
 
-	# def get_config(self):
-	# 	config = super(ResBlock, self).get_config()
-	# 	return config
+	def get_config(self):
+		config = super(ResBlock, self).get_config()
+		return config
 
 
 class UpScaleBlock(layers.Layer):
@@ -71,9 +75,9 @@ class UpScaleBlock(layers.Layer):
 		return outs
 
 
-	# def get_config(self):
-	# 	config = super(UpScaleBlock, self).get_config()
-	# 	return config	
+	def get_config(self):
+		config = super(UpScaleBlock, self).get_config()
+		return config	
 
 
 # Generator model.
@@ -203,7 +207,7 @@ def scale_images(images):
 	# Normalize (scale) values (divide by 255.0).
 	return {
 		"hr": images["hr"] / 255.0, 
-		"lr": images["lr"] / 255.0
+		"lr": images["lr"] / 255.0,
 	}
 
 
@@ -236,6 +240,7 @@ def save_images(valid_data, generator, e):
 	plt.title("HR Image")
 	plt.imshow(tar_img[0, :, :, :])
 	plt.savefig(f"SRGAN_Generator_Sample{e + 1}.png")
+	plt.close()
 
 
 def main():
@@ -281,7 +286,8 @@ def main():
 	discriminator = create_discriminator(hr_inputs)
 	disc_opt = keras.optimizers.Adam(beta_1=0.5, beta_2=0.99)
 	discriminator.compile(
-		loss="binary_crossentropy", #optimizer="adam", metrics=["accuracy"]
+		loss="binary_crossentropy", 
+		# optimizer="adam", 
 		optimizer=disc_opt,
 		metrics=["accuracy"]
 	)
@@ -296,17 +302,20 @@ def main():
 	)
 	gan_opt = keras.optimizers.Adam(beta_1=0.5, beta_2=0.99)
 	gan.compile(
-		loss=["binary_crossentropy", "mse"], loss_weights=[1e-3, 1],
-		#optimizer="adam",
+		loss=["binary_crossentropy", "mse"], 
+		loss_weights=[1e-3, 1],
+		# optimizer="adam",
 		optimizer=gan_opt,
 	)
 	gan.summary()
 
 	# Training loop.
-	epochs = 100 #1000#100#5
+	epochs = 500#1000#500#100#5
 	batch_size = 4
-	train_data = train_data.prefetch(buffer_size=autotune).batch(batch_size)
-	valid_data = valid_data.prefetch(buffer_size=autotune).batch(batch_size)
+	train_data = train_data.prefetch(buffer_size=autotune)\
+		.batch(batch_size)
+	valid_data = valid_data.prefetch(buffer_size=autotune)\
+		.batch(batch_size)
 	for e in range(epochs):
 		fake_label = np.zeros((batch_size, 1))
 		real_label = np.ones((batch_size, 1))
@@ -355,9 +364,9 @@ def main():
 		# Report the training progress. Save generator after every n
 		# epochs.
 		print(f"Epoch: {e + 1}, Gen-Loss: {g_loss}, Disc-Loss: {d_loss}")
-		if (e + 1) % 10 == 0:
-			generator.save("srgan_generator_epochs" + str(e + 1) + ".h5")
-			# generator.save("srgan_generator_epochs" + str(e + 1))
+		if (e + 1) % 10 == 0 or (e + 1) == epochs:
+			# generator.save("srgan_generator_epochs" + str(e + 1) + ".h5")
+			generator.save("srgan_generator_epochs" + str(e + 1))
 			save_images(valid_data, generator, e)
 
 	# Randomly sample from validation data and perform super resolution
@@ -369,7 +378,12 @@ def main():
 	tar_img = sample["hr"]
 
 	loaded_generator = load_model(
-		"srgan_generator_epochs" + str(epochs) + ".h5"
+		# "srgan_generator_epochs" + str(epochs) + ".h5",
+		"srgan_generator_epochs" + str(epochs),
+		custom_objects={
+			"ResBlock": ResBlock, 
+			"UpScaleBlock": UpScaleBlock,
+		}
 	)
 	gen_img = loaded_generator.predict(src_img)
 
