@@ -1,6 +1,6 @@
 # utils.py
-# A module containing utilities for SRGAN including VGG based loss and
-# image preprocessing.
+# A module containing utilities for SRGAN including image preprocessing
+# and generative sampling.
 # Tensorflow 2.4.0
 # Windows/MacOS/Linux
 # Python 3.7
@@ -9,38 +9,8 @@
 import random
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import Model
 from tensorflow.keras.applications import VGG19
 from matplotlib import pyplot as plt
-
-
-class VGGLoss:
-	def __init__(self, hr_shape):
-		# Initialize VGG19 model.
-		vgg = VGG19(
-			weights="imagenet", include_top=False, input_shape=hr_shape
-		)
-
-		# Only use the top X layers (see references for the reason why)
-		self.vgg = Model(
-			inputs=vgg.inputs, outputs=vgg.layers[10].output, 
-			name="vgg19"
-		)
-		self.vgg.summary()
-		self.vgg.trainable = False
-
-		# Initialize mean squared error loss.
-		self.mse = keras.losses.MeanSquaredError(name="vgg_mse")
-
-
-	def compute_loss(self, y_true, y_pred):
-		# Pass both the real and fake (generated) high res images
-		# through the VGG19 model.
-		real_features = self.vgg(y_true)
-		fake_features = self.vgg(y_pred)
-
-		# Return the MSE between the real and generated images.
-		return self.mse(real_features, fake_features)
 
 
 def resize_images(images):
@@ -59,7 +29,7 @@ def scale_images(images):
 	# Normalize (scale) values (divide by 255.0).
 	return {
 		"hr": images["hr"] / 255.0, 
-		"lr": images["lr"] / 255.0
+		"lr": images["lr"] / 255.0,
 	}
 
 

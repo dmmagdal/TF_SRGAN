@@ -5,16 +5,18 @@
 # Python 3.7
 
 
-import json
+import random
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import Model, layers
 from tensorflow.keras.models import load_model
 import tensorflow_datasets as tfds
+from srgan import ResBlock, UpScaleBlock, DiscriminatorBlock
 from srgan import create_generator, create_discriminator
 from srgan import build_vgg19
 from utils import resize_images, scale_images, save_images
+from matplotlib import pyplot as plt
 
 
 class SRGAN(keras.Model):
@@ -107,9 +109,9 @@ class SRGAN(keras.Model):
 				# loss of the predictions on the generated images with the number of times the discriminator
 				# falsely predicted the image was "real"/0.
 			)
-			#g_loss3 = self.g_loss_fn2(hr_imgs, fake_imgs, self.custom_loss_weights[1])
+			g_loss3 = self.g_loss_fn2(hr_imgs, fake_imgs, self.custom_loss_weights[1])
 			grads = gen_tape.gradient(
-				g_loss + g_loss2, self.generator.trainable_weights
+				g_loss + g_loss2 + g_loss3, self.generator.trainable_weights
 			)
 			self.gen_optimizer.apply_gradients(
 				zip(grads, self.generator.trainable_weights)
@@ -125,7 +127,6 @@ class SRGAN(keras.Model):
 
 
 	def save(self, path, h5=True):
-		# self.generator.save(path)
 		if h5:
 			self.generator.save(path + "_generator.h5")
 			self.discriminator.save(path + "_discriminator.h5")
@@ -213,8 +214,39 @@ def main():
 	)
 
 	# Save the generator from the GAN.
-	#gan.save(f"generator_{epochs}.h5")
-	gan.save(f"SRGAN_{epochs}")
+	# gan.save(f"SRGAN_{epochs}", h5=True)
+	gan.save(f"SRGAN_{epochs}", h5=False)
+
+	# Randomly sample from validation data and perform super resolution
+	# on that sample.
+	random.seed(42)
+	index = random.randint(0, len(list(valid_data.as_numpy_iterator())))
+	sample = list(valid_data.as_numpy_iterator())[index]
+	src_img = sample["lr"]
+	tar_img = sample["hr"]
+
+	loaded_generator = load_model(
+		# "SRGAN_" + str(epochs) + "_generator.h5",
+		"SRGAN_" + str(epochs) + "_generator",
+		custom_objects={
+			"ResBlock": ResBlock, 
+			"UpScaleBlock": UpScaleBlock,
+		}
+	)
+	gen_img = loaded_generator.predict(src_img)
+
+	# Plot all three images.
+	plt.figure(figsize=(16, 8))
+	plt.subplot(231)
+	plt.title("LR Image")
+	plt.imshow(src_img[0, :, :, :])
+	plt.subplot(232)
+	plt.title("Superresolution")
+	plt.imshow(gen_img[0, :, :, :])
+	plt.subplot(233)
+	plt.title("HR Image")
+	plt.imshow(tar_img[0, :, :, :])
+	plt.show()
 
 	# Exit the program.
 	exit(0)
