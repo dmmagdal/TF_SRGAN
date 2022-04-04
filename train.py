@@ -100,9 +100,14 @@ class SRGAN(keras.Model):
 			# discriminator).
 			g_loss = self.g_loss_fn(hr_imgs, fake_imgs) * self.custom_loss_weights[1]
 			g_loss2 = self.d_loss_fn(
-				labels[:batch_size, :], predictions[:batch_size, :], self.custom_loss_weights[0]
+				#labels[:batch_size, :], predictions[:batch_size, :], self.custom_loss_weights[0]
+				labels[-batch_size:, :], predictions[:batch_size, :], self.custom_loss_weights[0] # ***
+				# ***) This line is to see how many Real [0] predictions made it past the discriminator.
+				# We are trying to make sure that the generator fools the discriminator so we take the
+				# loss of the predictions on the generated images with the number of times the discriminator
+				# falsely predicted the image was "real"/0.
 			)
-			# g_loss2 = self.g_loss_fn2(hr_imgs, fake_imgs, self.custom_loss_weights[1])
+			#g_loss3 = self.g_loss_fn2(hr_imgs, fake_imgs, self.custom_loss_weights[1])
 			grads = gen_tape.gradient(
 				g_loss + g_loss2, self.generator.trainable_weights
 			)
@@ -122,11 +127,11 @@ class SRGAN(keras.Model):
 	def save(self, path, h5=True):
 		# self.generator.save(path)
 		if h5:
-			self.generator.save(path + ".h5")
-			self.discriminator.save(path + ".h5")
+			self.generator.save(path + "_generator.h5")
+			self.discriminator.save(path + "_discriminator.h5")
 		else:
-			self.generator.save(path)
-			self.discriminator.save(path)
+			self.generator.save(path + "_generator")
+			self.discriminator.save(path + "_discriminator")
 
 
 class GANMonitor(keras.callbacks.Callback):
@@ -209,7 +214,7 @@ def main():
 
 	# Save the generator from the GAN.
 	#gan.save(f"generator_{epochs}.h5")
-	gan.save("SRGAN_{epochs}")
+	gan.save(f"SRGAN_{epochs}")
 
 	# Exit the program.
 	exit(0)
