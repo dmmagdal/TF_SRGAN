@@ -72,3 +72,21 @@ def save_images(valid_data, generator, e, offset_by_one=False):
 		e += 1
 	plt.savefig(f"SRGAN_Generator_Sample{e}.png")
 	plt.close()
+
+
+def psnr(y_true, y_pred):
+	# Calculate the Peak Signal-to-Noise Ratio (PSNR) score between the
+	# two images. Source: https://www.geeksforgeeks.org/python-peak-
+	# signal-to-noise-ratio-psnr/
+	# PSNR = 10logbase10((L - 1)^2 / (MSE)) where L is the number of
+	# maximum possible intensity levels (minimum intensity level is
+	# supposed to be 0) in an image.
+	mse = keras.metrics.mean_squared_error(y_true, y_pred)
+
+	if mse == 0:
+		# MSE == 0 (exactly the same picture) means that no noise is
+		# present in the signal, therefore PSNR has not importance.
+		return 100
+
+	psnr = 10 * tf.math.log(1 / mse)
+	return psrn # units are dB
