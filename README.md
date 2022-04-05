@@ -2,7 +2,7 @@
 
 Description: This repository takes from multiple examples of the SRGAN for image super resolution and implements the model in Tensorflow 2.
 
-How to Use:
+### How to Use:
 
  > Install the required modules from requirements.txt with `pip install -r requirements.txt`. The best way to train SRGAN from scratch is to use the training loop defined in `train.py`. Simply run `python train.py` and it will download the dataset (div2k/bicubic_x4 from tensorflow datasets) and begin training the neural network. You can go inside and alter the training hyperparameters (ie `batch_size`, `epochs`, etc), making this repo very easy to use for training the model from scratch.
 
@@ -28,4 +28,4 @@ How to Use:
 
 4) A 500 epoch run with the training loop in train.py. This training loop included the following loss functions for the generator: Vgg-MSE (aka content loss), weighted BCE from discriminator (perceptual loss), and raw MSE between the high resolution and generated images. This iteration, while capturing more details, was considered not as good because the outcome looked smudged compared to the previous run on the list.
 
-5) A 100 epoch run with the training loop in srgan.py. Not a very good output.
+5) A 100 epoch run with the training loop in srgan.py. Not a very good output. Would use the training loop defined in train.py.

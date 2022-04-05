@@ -30,7 +30,6 @@ from tensorflow.keras.applications import VGG19
 from tensorflow.keras.models import load_model
 import tensorflow_datasets as tfds
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
 from matplotlib import pyplot as plt
 
 
