@@ -9,7 +9,6 @@
 import random
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras.applications import VGG19
 from matplotlib import pyplot as plt
 
 
