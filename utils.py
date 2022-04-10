@@ -88,4 +88,4 @@ def psnr(y_true, y_pred):
 		return 100
 
 	psnr = 10 * tf.math.log(1 / mse)
-	return psrn # units are dB
+	return psnr # units are dB
